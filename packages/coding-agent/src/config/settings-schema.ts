@@ -3400,6 +3400,27 @@ export const SETTINGS_SCHEMA = {
 		},
 	},
 
+	"read.minipack.enabled": {
+		type: "boolean",
+		default: true,
+		ui: {
+			tab: "files",
+			group: "Read Summaries",
+			label: "Minipack Compression",
+			description: "Compress JS/TS file reads exceeding token threshold losslessly using minipack",
+		},
+	},
+
+	"read.minipack.tokenThreshold": {
+		type: "number",
+		default: 1000,
+		ui: {
+			tab: "files",
+			group: "Read Summaries",
+			label: "Minipack Token Threshold",
+			description: "Minimum estimated token count before minipack JS/TS compression is applied",
+		},
+	},
 	"read.toolResultPreview": {
 		type: "boolean",
 		default: false,

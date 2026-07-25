@@ -15,6 +15,7 @@ export * from "./json-parse";
 export * as logger from "./logger";
 export * from "./loop-phase";
 export * from "./mermaid-ascii";
+export * from "./minipack";
 export * from "./mime";
 export * from "./path";
 export * from "./path-tree";

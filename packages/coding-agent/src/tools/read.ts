@@ -10,7 +10,17 @@ import type {
 	ToolTier,
 } from "@oh-my-pi/pi-agent-core";
 import type { ImageContent, TextContent } from "@oh-my-pi/pi-ai";
-import { type ImageMetadata, isProbablyBinary, logger, prompt, readImageMetadata } from "@oh-my-pi/pi-utils";
+import {
+	estimateMinipackTokens,
+	type ImageMetadata,
+	isJSOrTSCode,
+	isJSOrTSPath,
+	isProbablyBinary,
+	logger,
+	minipackCompress,
+	prompt,
+	readImageMetadata,
+} from "@oh-my-pi/pi-utils";
 import {
 	canonicalSnapshotKey,
 	getFileSnapshotStore,
@@ -383,6 +393,7 @@ export interface ReadToolDetails {
 		lineNumbers?: Array<number | null>;
 	};
 	summary?: { lines: number; elidedSpans: number; elidedLines: number };
+	minipack?: { originalTokens: number; compressedTokens: number; ratio: number };
 	/** Number of unresolved git conflicts surfaced by this read (TUI uses for inline `⚠ N` badge). */
 	conflictCount?: number;
 	/** Paths recovered from a delimited read argument; used only by the TUI to render one call as multiple read rows. */
@@ -1549,6 +1560,27 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 		}
 
 		details.fileSize = fileSize;
+		if (!isRawSelector(parsed) && this.session.settings.get("read.minipack.enabled")) {
+			const minipackThreshold = this.session.settings.get("read.minipack.tokenThreshold") ?? 1000;
+			const isTargetFile = isJSOrTSPath(absolutePath) || isJSOrTSPath(localReadPath);
+			const firstText = content.find((c): c is TextContent => c.type === "text");
+			const rawCode = details.displayContent?.text;
+			if (firstText && (isTargetFile || (rawCode && isJSOrTSCode(rawCode)) || isJSOrTSCode(firstText.text))) {
+				const sourceToCompress = rawCode || firstText.text;
+				const estimatedTokens = estimateMinipackTokens(sourceToCompress);
+				if (estimatedTokens >= minipackThreshold) {
+					const res = minipackCompress(sourceToCompress, { path: absolutePath || localReadPath });
+					if (res.compressed) {
+						firstText.text = res.code;
+						details.minipack = {
+							originalTokens: res.originalTokens,
+							compressedTokens: res.compressedTokens,
+							ratio: res.ratio,
+						};
+					}
+				}
+			}
+		}
 		markMarkdownContentType(this.session, details, absolutePath);
 		if (suffixResolution) {
 			details.suffixResolution = suffixResolution;
