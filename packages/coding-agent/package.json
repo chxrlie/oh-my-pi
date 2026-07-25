@@ -419,6 +419,14 @@
       "types": "./src/hindsight/*.ts",
       "import": "./src/hindsight/*.ts"
     },
+    "./mempalace": {
+      "types": "./src/mempalace/index.ts",
+      "import": "./src/mempalace/index.ts"
+    },
+    "./mempalace/*": {
+      "types": "./src/mempalace/*.ts",
+      "import": "./src/mempalace/*.ts"
+    },
     "./modes": {
       "types": "./src/modes/index.ts",
       "import": "./src/modes/index.ts"

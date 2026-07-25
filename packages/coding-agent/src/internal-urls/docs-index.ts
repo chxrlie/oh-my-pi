@@ -151,7 +151,16 @@ export function getDocFilenames(): readonly string[] {
 	return getIndex().filenames;
 }
 
-/** Resolve a documentation file's content, or `undefined` when not found. */
-export function getEmbeddedDoc(relativePath: string): Promise<string | undefined> {
-	return getIndex().getBody(relativePath);
+/**
+ * Resolve a documentation file's content, or `undefined` when not found.
+ *
+ * The `.md` suffix is optional: `omp://docs/mempalace-memory-backend` resolves
+ * the same body as `omp://docs/mempalace-memory-backend.md`.
+ */
+export async function getEmbeddedDoc(relativePath: string): Promise<string | undefined> {
+	const idx = getIndex();
+	const direct = await idx.getBody(relativePath);
+	if (direct !== undefined) return direct;
+	if (relativePath.endsWith(".md")) return undefined;
+	return idx.getBody(`${relativePath}.md`);
 }

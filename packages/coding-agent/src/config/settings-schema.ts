@@ -140,7 +140,7 @@ export const TAB_GROUPS: Record<SettingTab, readonly string[]> = {
 		"Git",
 	],
 	context: ["General", "Compaction", "Rules (TTSR)", "Experimental"],
-	memory: ["General", "Auto-Learn", "Mnemopi", "Hindsight"],
+	memory: ["General", "Auto-Learn", "Mnemopi", "MemPalace", "Hindsight"],
 	files: ["Editing", "Reading", "Read Summaries", "LSP"],
 	shell: ["Bash", "Eval & Runtimes"],
 	tools: [
@@ -2614,17 +2614,18 @@ export const SETTINGS_SCHEMA = {
 	"memories.summaryInjectionTokenLimit": { type: "number", default: 5000 },
 
 	// Memory backend selector — picks between local memories pipeline,
-	// Mnemopi local SQLite, Hindsight remote memory, or off. The legacy
-	// `memories.enabled` flag is migration input only; see config/settings.ts.
+	// Mnemopi local SQLite, MemPalace (local Python package), Hindsight remote
+	// memory, or off. The legacy `memories.enabled` flag is migration input
+	// only; see config/settings.ts.
 	"memory.backend": {
 		type: "enum",
-		values: ["off", "local", "hindsight", "mnemopi"] as const,
+		values: ["off", "local", "hindsight", "mnemopi", "mempalace"] as const,
 		default: "off",
 		ui: {
 			tab: "memory",
 			group: "General",
 			label: "Memory Backend",
-			description: "Off, local summary pipeline, Mnemopi SQLite, or Hindsight remote memory",
+			description: "Off, local summary pipeline, Mnemopi SQLite, MemPalace, or Hindsight remote memory",
 			options: [
 				{ value: "off", label: "Off", description: "No memory subsystem runs" },
 				{ value: "local", label: "Local", description: "Local rollout summarisation pipeline (memory_summary.md)" },
@@ -2633,6 +2634,11 @@ export const SETTINGS_SCHEMA = {
 					value: "mnemopi",
 					label: "Mnemopi",
 					description: "Local SQLite recall/retain backend with optional embeddings",
+				},
+				{
+					value: "mempalace",
+					label: "MemPalace",
+					description: "Local MemPalace store driven by the Python mempalace package (MCP + CLI)",
 				},
 			],
 		},
@@ -2909,6 +2915,35 @@ export const SETTINGS_SCHEMA = {
 	"mnemopi.recallMaxQueryChars": { type: "number", default: 4000 },
 	"mnemopi.injectionTokenLimit": { type: "number", default: 5000 },
 	"mnemopi.debug": { type: "boolean", default: false },
+
+	// MemPalace local memory backend (delegates to the Python `mempalace` package).
+	// Booleans surface in the UI behind `mempalaceActive`; the timeout/cadence
+	// numbers are config-file-only knobs (numbers without `options` are hidden).
+	"mempalace.connectTimeoutMs": { type: "number", default: 30000 },
+	"mempalace.requestTimeoutMs": { type: "number", default: 30000 },
+	"mempalace.ingestIntervalMessages": { type: "number", default: 15 },
+	"mempalace.autoIngest": {
+		type: "boolean",
+		default: true,
+		ui: {
+			tab: "memory",
+			group: "MemPalace",
+			label: "MemPalace Auto Ingest",
+			description: "Periodically mine the current project into the palace while the session runs",
+			condition: "mempalaceActive",
+		},
+	},
+	"mempalace.importLocalMemories": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "memory",
+			group: "MemPalace",
+			label: "MemPalace Import Local Memories",
+			description: "One-time import of the local memories directory into the palace on session start",
+			condition: "mempalaceActive",
+		},
+	},
 
 	// Hindsight (https://hindsight.vectorize.io)
 	"hindsight.apiUrl": {
