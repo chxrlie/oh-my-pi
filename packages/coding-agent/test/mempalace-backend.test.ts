@@ -129,6 +129,7 @@ async function installDeps(): Promise<void> {
 			states.push(state);
 			return state;
 		},
+		sessionsDir: () => SESSION_DIR,
 	});
 }
 
@@ -295,7 +296,7 @@ describe("mempalaceBackend.start", () => {
 		expect(states).toHaveLength(0);
 	});
 
-	it("routes the cadence callback to `mempalace mine <dir>`", async () => {
+	it("routes the cadence callback to `mempalace mine <dir> --mode convos`", async () => {
 		cliScript.set("mine", cliResult(0, "mined 12 files"));
 		const session = fakeSession();
 		await mempalaceBackend.start(startOptions(session));
@@ -304,7 +305,19 @@ describe("mempalaceBackend.start", () => {
 		const result = await states[0].options.runIngest(target);
 
 		expect(result.exitCode).toBe(0);
-		expect(cliCalls.at(-1)?.args).toEqual(["mine", SESSION_DIR]);
+		expect(cliCalls.at(-1)?.args).toEqual(["mine", SESSION_DIR, "--mode", "convos"]);
+	});
+
+	it("mines a session-log subdirectory as convos even when the target is not `source: session`", async () => {
+		cliScript.set("mine", cliResult(0, "mined 12 files"));
+		const session = fakeSession();
+		await mempalaceBackend.start(startOptions(session));
+
+		const nested = `${SESSION_DIR}/-Projects-foo`;
+		const target: IngestTarget = { dir: nested, source: "cwd" };
+		await states[0].options.runIngest(target);
+
+		expect(cliCalls.at(-1)?.args).toEqual(["mine", nested, "--mode", "convos"]);
 	});
 });
 
@@ -604,7 +617,7 @@ describe("mempalaceBackend.preCompactionContext", () => {
 
 		const rendered = await mempalaceBackend.preCompactionContext!([], session.settings, session);
 
-		expect(cliCalls[0]?.args).toEqual(["mine", SESSION_DIR]);
+		expect(cliCalls[0]?.args).toEqual(["mine", SESSION_DIR, "--mode", "convos"]);
 		expect(rendered).toContain(SESSION_DIR);
 		expect(rendered).toContain("MemPalace");
 	});
@@ -645,7 +658,7 @@ describe("mempalaceBackend.enqueue and clear", () => {
 
 		await mempalaceBackend.enqueue(AGENT_DIR, PROJECT_DIR, session);
 
-		expect(cliCalls[0]?.args).toEqual(["mine", SESSION_DIR]);
+		expect(cliCalls[0]?.args).toEqual(["mine", SESSION_DIR, "--mode", "convos"]);
 	});
 
 	it("survives an ingest failure", async () => {

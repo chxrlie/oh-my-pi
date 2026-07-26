@@ -16,7 +16,7 @@
  */
 
 import * as path from "node:path";
-import { logger } from "@oh-my-pi/pi-utils";
+import { getSessionsDir, logger } from "@oh-my-pi/pi-utils";
 import type { Settings } from "../config/settings";
 import type {
 	MemoryBackend,
@@ -93,6 +93,8 @@ export interface MempalaceBackendDeps {
 	createTransport(options: MempalaceTransportOptions): MempalaceTransportLike;
 	runCli(args: string[], opts?: { cwd?: string; timeoutMs?: number }): Promise<CliRunResult>;
 	createSessionState(options: MempalaceSessionStateFactoryOptions): MempalaceSessionStateLike;
+	/** Root of the harness's own session-log directory (`~/.omp/agent/sessions`). Injectable for tests. */
+	sessionsDir(): string;
 }
 
 const defaultDeps: MempalaceBackendDeps = {
@@ -100,6 +102,7 @@ const defaultDeps: MempalaceBackendDeps = {
 	createTransport: options => new MempalaceTransport(options),
 	runCli: runMempalaceCli,
 	createSessionState: options => new MempalaceSessionState(options),
+	sessionsDir: () => getSessionsDir(),
 };
 
 let deps: MempalaceBackendDeps = defaultDeps;
@@ -391,9 +394,29 @@ function ingestTargetFor(session: AgentSession | undefined, cwd: string): Ingest
 	return resolveIngestTarget({ cwd, ...(dir ? { sessionFileDir: dir } : {}) });
 }
 
+/**
+ * Whether `dir` is the harness's own session-log root or nested under it
+ * (`~/.omp/agent/sessions/**`). That directory holds raw JSONL transcripts,
+ * not project source — mining it in the default "projects" mode chunks the
+ * raw JSON as if it were code, flooding the palace with noise (#1722).
+ *
+ * Checked against the real filesystem root via the injectable
+ * `deps.sessionsDir()` rather than `target.source`, so any future ingest
+ * target pointed here — however it was resolved — always mines through the
+ * dedicated Pi-session conversation parser instead of the project miner.
+ */
+function isHarnessSessionDir(dir: string): boolean {
+	const root = path.resolve(deps.sessionsDir());
+	const resolved = path.resolve(dir);
+	const rel = path.relative(root, resolved);
+	return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
 /** Mine a directory into the palace. Never throws; the breaker guards repeats. */
 async function runIngest(target: IngestTarget): Promise<CliRunResult> {
-	const result = await runCliGuarded(["mine", target.dir]);
+	const args = ["mine", target.dir];
+	if (isHarnessSessionDir(target.dir)) args.push("--mode", "convos");
+	const result = await runCliGuarded(args);
 	lastIngest = { target, exitCode: result.exitCode };
 	if (result.exitCode !== 0) {
 		logger.debug("MemPalace: ingest failed.", {
