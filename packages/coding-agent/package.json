@@ -560,9 +560,21 @@
       "types": "./src/tui/*.ts",
       "import": "./src/tui/*.ts"
     },
+    "./usage/*": {
+      "types": "./src/usage/*.ts",
+      "import": "./src/usage/*.ts"
+    },
     "./utils/*": {
       "types": "./src/utils/*.ts",
       "import": "./src/utils/*.ts"
+    },
+    "./wakatime": {
+      "types": "./src/wakatime/index.ts",
+      "import": "./src/wakatime/index.ts"
+    },
+    "./wakatime/*": {
+      "types": "./src/wakatime/*.ts",
+      "import": "./src/wakatime/*.ts"
     },
     "./web/*": {
       "types": "./src/web/*.ts",

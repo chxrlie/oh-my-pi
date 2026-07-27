@@ -2,6 +2,7 @@ import type { Clipboard, InMemorySnapshotStore } from "@oh-my-pi/hashline";
 import type { AgentOptions, AgentTelemetryConfig, AgentTool } from "@oh-my-pi/pi-agent-core";
 import type { FetchImpl, ImageContent, Model, ServiceTierByFamily, ToolChoice } from "@oh-my-pi/pi-ai";
 import { logger } from "@oh-my-pi/pi-utils";
+import packageJson from "../../package.json" with { type: "json" };
 import type { AsyncJobManager } from "../async/job-manager";
 import type { Rule } from "../capability/rule";
 import type { PromptTemplate } from "../config/prompt-templates";
@@ -34,6 +35,7 @@ import type { AgentOutputManager } from "../task/output-manager";
 import { canSpawnAtDepth, type StructuredSubagentSchemaMode } from "../task/types";
 import type { EventBus } from "../utils/event-bus";
 import { type InspectImageMode, isInspectImageToolActive } from "../utils/inspect-image-mode";
+import { createHeartbeatEmitter, resolveWakatimeConfig, withWakatimeTracking } from "../wakatime";
 import { WebSearchTool } from "../web/search";
 import type { WorkspaceTree } from "../workspace-tree";
 import { AskTool } from "./ask";
@@ -64,6 +66,8 @@ import type { PlanProposalHandler } from "./resolve";
 import { SecurityScanTool } from "./security-scan";
 import { supportsExternalThinking, ThinkTool } from "./think";
 import { type TodoPhase, TodoTool } from "./todo";
+import { UsageTool } from "./usage";
+import { WakatimeTool } from "./wakatime";
 import { WriteTool } from "./write";
 import { isMountableUnderXdev, type XdevState } from "./xdev";
 import { YieldTool } from "./yield";
@@ -106,7 +110,9 @@ export * from "./security-scan";
 export * from "./think";
 export * from "./todo";
 export * from "./tts";
+export * from "./usage";
 export * from "./vibe";
+export * from "./wakatime";
 export * from "./write";
 export * from "./xdev";
 export * from "./yield";
@@ -443,6 +449,8 @@ export const BUILTIN_TOOLS: Record<BuiltinToolName, ToolFactory> = {
 	reflect: MemoryReflectTool.createIf,
 	learn: LearnTool.createIf,
 	manage_skill: ManageSkillTool.createIf,
+	wakatime: WakatimeTool.createIf,
+	usage: UsageTool.createIf,
 };
 
 export const HIDDEN_TOOLS: Record<HiddenToolName, ToolFactory> = {
@@ -635,6 +643,8 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 				session.settings.get("autolearn.enabled") &&
 				((session.taskDepth ?? 0) === 0 || requestedTools !== undefined)
 			);
+		if (name === "wakatime") return session.settings.get("wakatime.enabled");
+		if (name === "usage") return session.settings.get("usage.enabled");
 		if (name === "learn") {
 			return (
 				session.settings.get("autolearn.enabled") &&
@@ -683,6 +693,23 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 	const builtInNames = new Set(tools.map(tool => tool.name));
 	for (const tool of tools) toolRegistry.set(tool.name, tool);
 
+	// WakaTime heartbeats ride the tools that touch files. Both switches are read
+	// first, so a disabled integration resolves no config, spawns no emitter, and
+	// leaves every tool object exactly as its factory built it.
+	let trackWakatime = (tool: Tool) => tool;
+	if (session.settings.get("wakatime.enabled") && session.settings.get("wakatime.heartbeats")) {
+		const emitter = createHeartbeatEmitter({
+			config: await resolveWakatimeConfig({ cliPath: session.settings.get("wakatime.cliPath") }),
+			cwd: session.cwd,
+			category: session.settings.get("wakatime.category"),
+			pluginId: `oh-my-pi/${packageJson.version} omp-wakatime/1`,
+		});
+		trackWakatime = tool => withWakatimeTracking(tool, emitter, session.cwd);
+		// Wrapped before the xd:// partition below so the discoverable file tools
+		// (ast_grep, ast_edit) stay tracked after they move into the registry.
+		tools = tools.map(trackWakatime);
+	}
+
 	// Ordinary sessions use xd:// for discoverable built-ins, custom tools, and
 	// MCP tools. Structured children must expose only their host-provided names,
 	// so never allocate a registry that later SDK assembly could populate.
@@ -721,7 +748,7 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 	) {
 		const writeTool = await logger.time("createTools:write", BUILTIN_TOOLS.write, session);
 		if (writeTool) {
-			const wrapped = wrapToolWithMetaNotice(writeTool);
+			const wrapped = trackWakatime(wrapToolWithMetaNotice(writeTool));
 			tools.push(wrapped);
 			toolRegistry.set(wrapped.name, wrapped);
 			builtInNames.add(wrapped.name);
@@ -730,7 +757,7 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 	if (!restrictToolNames && xdevMounted && !tools.some(tool => tool.name === "read")) {
 		const readTool = await logger.time("createTools:read", BUILTIN_TOOLS.read, session);
 		if (readTool) {
-			const wrapped = wrapToolWithMetaNotice(readTool);
+			const wrapped = trackWakatime(wrapToolWithMetaNotice(readTool));
 			tools.push(wrapped);
 			toolRegistry.set(wrapped.name, wrapped);
 			builtInNames.add(wrapped.name);

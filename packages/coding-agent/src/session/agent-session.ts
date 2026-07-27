@@ -203,6 +203,8 @@ import {
 import { supportsExternalThinking } from "../tools/think";
 import type { TodoPhase } from "../tools/todo";
 import { ToolError } from "../tools/tool-errors";
+import { type LedgerEntry, recordLedgerEntry } from "../usage/cost-ledger";
+import { resolveProjectName } from "../usage/project-resolver";
 import { parseCommandArgs } from "../utils/command-args";
 import type { EditMode } from "../utils/edit-mode";
 import { resolveFileDisplayMode } from "../utils/file-display-mode";
@@ -2670,6 +2672,7 @@ export class AgentSession {
 					this.sessionId,
 					assistantMsg.provider,
 				);
+				this.#recordProjectCost(assistantMsg);
 			}
 			if (event.message.role === "toolResult") {
 				const { toolName, toolCallId, isError, content } = event.message;
@@ -3658,6 +3661,47 @@ export class AgentSession {
 
 	#activeProviderSessionId(sessionId?: string): string {
 		return this.#freshProviderSessionId ?? this.#providerSessionId ?? sessionId ?? this.sessionManager.getSessionId();
+	}
+
+	/**
+	 * Attribute this turn's spend to the local per-project cost ledger.
+	 *
+	 * Runs once per settled assistant message, so it must stay off the hot
+	 * path: project resolution is async (`.wakatime-project` walk, projectmap
+	 * regexes, git probe — cached per directory), the ledger append is
+	 * best-effort, and nothing here is awaited or allowed to reject upward.
+	 */
+	#recordProjectCost(assistantMsg: AssistantMessage): void {
+		try {
+			if (!this.settings.get("usage.projectLedger")) return;
+			const usage = assistantMsg.usage;
+			// Free, empty turns (aborted before any tokens flowed) carry no
+			// signal; skipping here also avoids the async resolve hop. The
+			// ledger enforces the same rule for direct callers.
+			if (usage.cost.total === 0 && usage.input + usage.output + usage.cacheRead + usage.cacheWrite === 0) {
+				return;
+			}
+			const pending: Omit<LedgerEntry, "project"> = {
+				recordedAt: assistantMsg.timestamp,
+				sessionId: this.sessionManager.getSessionId(),
+				model: assistantMsg.model,
+				provider: assistantMsg.provider,
+				inputTokens: usage.input,
+				outputTokens: usage.output,
+				cacheReadTokens: usage.cacheRead,
+				cacheWriteTokens: usage.cacheWrite,
+				costUsd: usage.cost.total,
+			};
+			void resolveProjectName(this.sessionManager.getCwd())
+				.then(project => {
+					recordLedgerEntry({ ...pending, project });
+				})
+				.catch(err => {
+					logger.debug("usage ledger: project attribution failed", { err: String(err) });
+				});
+		} catch (err) {
+			logger.debug("usage ledger: skipped for this message", { err: String(err) });
+		}
 	}
 
 	#adoptInheritedProviderPromptCacheKey(): void {

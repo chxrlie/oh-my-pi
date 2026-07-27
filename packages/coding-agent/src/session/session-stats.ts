@@ -330,7 +330,8 @@ export class SessionStatsTracker {
 	}
 }
 
-function taskToolUsage(details: unknown): Usage | undefined {
+/** Extract the subagent `Usage` folded into a `task` tool result's `details`, when present. */
+export function taskToolUsage(details: unknown): Usage | undefined {
 	if (!details || typeof details !== "object") return undefined;
 	const usage = Reflect.get(details, "usage");
 	return isUsage(usage) ? usage : undefined;

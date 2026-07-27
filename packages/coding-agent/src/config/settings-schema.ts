@@ -149,6 +149,8 @@ export const TAB_GROUPS: Record<SettingTab, readonly string[]> = {
 		"Grep & Browser",
 		"Computer",
 		"GitHub",
+		"WakaTime",
+		"Usage",
 		"Output Limits",
 		"Execution",
 		"Discovery & MCP",
@@ -3820,6 +3822,76 @@ export const SETTINGS_SCHEMA = {
 				},
 				{ value: "always", label: "Always", description: "Forces a comprehensive todo list on the first message" },
 			],
+		},
+	},
+
+	// WakaTime coding-activity integration
+	"wakatime.enabled": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "tools",
+			group: "Available Tools",
+			label: "WakaTime",
+			description:
+				"Enable the wakatime tool and coding-activity heartbeats (sends file paths and project names to WakaTime)",
+		},
+	},
+
+	"wakatime.heartbeats": {
+		type: "boolean",
+		default: true,
+		ui: {
+			tab: "tools",
+			group: "WakaTime",
+			label: "Activity Heartbeats",
+			description: "Emit WakaTime heartbeats as the agent reads and edits files",
+		},
+	},
+
+	"wakatime.category": {
+		type: "string",
+		default: "ai coding",
+		ui: {
+			tab: "tools",
+			group: "WakaTime",
+			label: "Activity Category",
+			description: "WakaTime category recorded for agent activity",
+		},
+	},
+
+	"wakatime.cliPath": {
+		type: "string",
+		default: undefined,
+		ui: {
+			tab: "tools",
+			group: "WakaTime",
+			label: "wakatime-cli Path",
+			description: "Override the auto-detected wakatime-cli binary",
+		},
+	},
+
+	// Session usage reporting and per-project cost attribution
+	"usage.enabled": {
+		type: "boolean",
+		default: true,
+		ui: {
+			tab: "tools",
+			group: "Available Tools",
+			label: "Usage",
+			description: "Enable the usage tool for reporting session token spend and per-project cost",
+		},
+	},
+
+	"usage.projectLedger": {
+		type: "boolean",
+		default: true,
+		ui: {
+			tab: "tools",
+			group: "Usage",
+			label: "Project Cost Ledger",
+			description:
+				"Record token spend and estimated cost per project to a local SQLite ledger (never sent anywhere)",
 		},
 	},
 

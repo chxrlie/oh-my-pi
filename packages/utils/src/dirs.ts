@@ -709,6 +709,17 @@ export function getStatsDbPath(): string {
 	return dirs.rootSubdir("stats.db", "data");
 }
 
+/**
+ * Get the per-project usage/cost ledger database path (~/.omp/usage-ledger.db).
+ * Honors the `OMP_USAGE_LEDGER_DB` env var when set so tests can isolate the
+ * ledger file without touching the rest of the config root.
+ */
+export function getUsageLedgerDbPath(): string {
+	const override = process.env.OMP_USAGE_LEDGER_DB;
+	if (override) return override;
+	return dirs.rootSubdir("usage-ledger.db", "data");
+}
+
 /** Get the autoresearch state directory (~/.omp/autoresearch). */
 export function getAutoresearchDir(): string {
 	return dirs.rootSubdir("autoresearch", "state");
