@@ -427,6 +427,14 @@
       "types": "./src/mempalace/*.ts",
       "import": "./src/mempalace/*.ts"
     },
+    "./mempalace-native": {
+      "types": "./src/mempalace-native/index.ts",
+      "import": "./src/mempalace-native/index.ts"
+    },
+    "./mempalace-native/*": {
+      "types": "./src/mempalace-native/*.ts",
+      "import": "./src/mempalace-native/*.ts"
+    },
     "./modes": {
       "types": "./src/modes/index.ts",
       "import": "./src/modes/index.ts"

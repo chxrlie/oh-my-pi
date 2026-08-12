@@ -123,6 +123,13 @@ const CONDITIONS: Record<string, () => boolean> = {
 			return false;
 		}
 	},
+	mempalaceNativeActive: () => {
+		try {
+			return Settings.instance.get("memory.backend") === "mempalace-native";
+		} catch {
+			return false;
+		}
+	},
 	autolearnActive: () => {
 		try {
 			return Settings.instance.get("autolearn.enabled") === true;

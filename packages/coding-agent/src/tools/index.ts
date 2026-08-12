@@ -20,6 +20,7 @@ import type { LocalProtocolOptions } from "../internal-urls";
 import type { DaemonCompletionNotification } from "../launch/protocol";
 import { LspTool } from "../lsp";
 import type { MCPManager } from "../mcp";
+import type { MempalaceNativeSession } from "../mempalace-native/types";
 import type { MnemopiSessionState } from "../mnemopi/state";
 import type { PlanModeState } from "../plan-mode/state";
 import type { AgentLifecycleManager } from "../registry/agent-lifecycle";
@@ -60,6 +61,7 @@ import { MemoryEditTool } from "./memory-edit";
 import { MemoryRecallTool } from "./memory-recall";
 import { MemoryReflectTool } from "./memory-reflect";
 import { MemoryRetainTool } from "./memory-retain";
+import { MempalaceTool } from "./mempalace";
 import { wrapToolWithMetaNotice } from "./output-meta";
 import { ReadTool } from "./read";
 import type { PlanProposalHandler } from "./resolve";
@@ -102,6 +104,7 @@ export * from "./memory-edit";
 export * from "./memory-recall";
 export * from "./memory-reflect";
 export * from "./memory-retain";
+export * from "./mempalace";
 export * from "./read";
 export * from "./report-tool-issue";
 export * from "./resolve";
@@ -253,6 +256,8 @@ export interface ToolSession {
 	getHindsightSessionState?: () => HindsightSessionState | undefined;
 	/** Get Mnemopi runtime state for this agent session. */
 	getMnemopiSessionState?: () => MnemopiSessionState | undefined;
+	/** Get MemPalace native runtime state for this agent session. */
+	getMempalaceNativeSessionState?: () => MempalaceNativeSession | undefined;
 	/** Agent identity used for IRC routing. Returns the registry id (e.g. "Main", "AuthLoader"). */
 	getAgentId?: () => string | null;
 	/** Look up a registered tool by name (used by the eval js backend's tool bridge). */
@@ -447,6 +452,7 @@ export const BUILTIN_TOOLS: Record<BuiltinToolName, ToolFactory> = {
 	retain: MemoryRetainTool.createIf,
 	recall: MemoryRecallTool.createIf,
 	reflect: MemoryReflectTool.createIf,
+	mempalace: MempalaceTool.createIf,
 	learn: LearnTool.createIf,
 	manage_skill: ManageSkillTool.createIf,
 	wakatime: WakatimeTool.createIf,
@@ -638,6 +644,7 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 			return ["hindsight", "mnemopi"].includes(session.settings.get("memory.backend") ?? "");
 		}
 		if (name === "memory_edit") return session.settings.get("memory.backend") === "mnemopi";
+		if (name === "mempalace") return session.settings.get("memory.backend") === "mempalace-native";
 		if (name === "manage_skill")
 			return (
 				session.settings.get("autolearn.enabled") &&

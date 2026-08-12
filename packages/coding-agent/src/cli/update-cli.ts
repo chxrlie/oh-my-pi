@@ -16,6 +16,20 @@ import { withFileLock } from "@oh-my-pi/pi-utils/file-lock";
 import { $ } from "bun";
 import { theme } from "../modes/theme/theme";
 import { isTimeoutError, withTimeoutSignal } from "../utils/fetch-timeout";
+import {
+	type CommandRunner,
+	defaultCommandRunner,
+	describeOverlayPlan,
+	type OverlayConfig,
+	OverlayUpdateError,
+	type OverlayUpdateResult,
+	overlayNeedsRebuild,
+	overlayStampPath,
+	readOverlayHeadCommit,
+	readOverlayStamp,
+	runOverlayUpdate,
+	writeOverlayStamp,
+} from "./update-overlay";
 
 const REPO = "can1357/oh-my-pi";
 const PACKAGE = "@oh-my-pi/pi-coding-agent";
@@ -1167,9 +1181,12 @@ export async function replaceBinaryForUpdate(options: BinaryReplacementOptions):
 		}
 
 		backupReady = false;
-		// Swap done and verified. On Windows the backup is still the running
-		// process image and cannot be unlinked until this process exits, so a
-		// failure here must NOT fail an otherwise-successful update.
+		// Swap done and verified. A stock update unlinks the overlay stamp so
+		// future runs do not falsely report patches as current.
+		await unlinkIfExists(overlayStampPath(options.targetPath));
+		// On Windows the backup is still the running process image and cannot
+		// be unlinked until this process exits, so a failure here must NOT fail
+		// an otherwise-successful update.
 		await removeBackupBestEffort(options.backupPath);
 		return verification;
 	} catch (err) {
@@ -1658,9 +1675,68 @@ function installerHint(): string {
 }
 
 /**
- * Run the update command.
+ * Install a binary built from a local overlay checkout instead of the stock
+ * release asset, so local patches survive the update (see `update-overlay.ts`).
+ *
+ * The swap reuses {@link replaceBinaryForUpdate}: same backup, same version
+ * verification, same rollback. A build whose reported version does not match
+ * the release restores the previous binary rather than leaving a mismatch.
  */
-export async function runUpdateCommand(opts: { force: boolean; check: boolean }): Promise<void> {
+export async function updateViaOverlayAt(
+	targetPath: string,
+	expectedVersion: string,
+	config: OverlayConfig,
+	options: {
+		run?: CommandRunner;
+		verifyInstalledVersion?: typeof verifyInstalledVersion;
+	} = {},
+): Promise<OverlayUpdateResult> {
+	const result = await runOverlayUpdate({
+		config,
+		expectedVersion,
+		repoSlug: REPO,
+		deps: {
+			run: options.run ?? defaultCommandRunner,
+			log: message => console.log(chalk.dim(message)),
+			installBinary: async (builtPath, version) => {
+				const tempPath = `${targetPath}.new`;
+				// Same uniqueness rationale as updateViaBinaryAt: a stale backup may
+				// still be locked, so never reuse a fixed name.
+				const backupPath = `${targetPath}.${Date.now()}.${process.pid}.bak`;
+				await fs.promises.copyFile(builtPath, tempPath);
+				if (process.platform !== "win32") await fs.promises.chmod(tempPath, 0o755);
+				console.log(chalk.dim("Installing patched build..."));
+				await replaceBinaryForUpdate({
+					targetPath,
+					tempPath,
+					backupPath,
+					expectedVersion: version,
+					verifyInstalledVersion: options.verifyInstalledVersion ?? verifyInstalledVersion,
+				});
+				await sweepStaleBackups(targetPath);
+			},
+		},
+	});
+	await writeOverlayStamp(targetPath, { version: expectedVersion, commit: result.commit });
+	printVerifiedVersion(expectedVersion);
+	console.log(chalk.dim(`Built from ${result.branch} @ ${result.commit.slice(0, 12)} on ${result.tag}`));
+	console.log(chalk.dim(`  (undo: git -C ${config.repoPath} reset --hard ${result.headBefore})`));
+	console.log(chalk.dim(`Restart ${APP_NAME} to use the patched build`));
+	return result;
+}
+
+/**
+ * Run the update command.
+ *
+ * `overlay` carries local patches onto the release instead of installing the
+ * stock binary; it only applies to standalone binary installs, since a
+ * package-manager-managed install has no place to put a locally built binary.
+ */
+export async function runUpdateCommand(opts: {
+	force: boolean;
+	check: boolean;
+	overlay?: OverlayConfig;
+}): Promise<void> {
 	console.log(chalk.dim(`Current version: ${VERSION}`));
 
 	// Check for updates
@@ -1674,13 +1750,36 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 
 	const comparison = compareVersions(release.version, VERSION);
 
-	if (comparison <= 0 && !opts.force) {
+	// Resolve the install target early to check if overlay is applicable and to
+	// read the stamp if so. An unresolvable path is skipped in check-mode but
+	// reported for real overlay runs.
+	let target: UpdateTarget | undefined;
+	let overlayStale = false;
+	try {
+		target = await resolveUpdateTarget();
+		if (opts.overlay && target.method === "binary") {
+			const [stamp, headCommit] = await Promise.all([
+				readOverlayStamp(target.path),
+				readOverlayHeadCommit(opts.overlay, defaultCommandRunner),
+			]);
+			overlayStale = overlayNeedsRebuild({ stamp, headCommit, releaseVersion: release.version });
+		}
+	} catch (err) {
+		if (opts.overlay) {
+			console.error(chalk.red(`Update failed: ${err instanceof Error ? err.message : String(err)}`));
+			process.exit(1);
+		}
+	}
+
+	if (comparison <= 0 && !opts.force && !overlayStale) {
 		console.log(chalk.green(`${theme.status.success} Already up to date`));
 		return;
 	}
 
 	if (comparison > 0) {
 		console.log(chalk.cyan(`New version available: ${release.version}`));
+	} else if (overlayStale) {
+		console.log(chalk.cyan(`Overlay patches changed; rebuilding against ${release.version}`));
 	} else {
 		console.log(chalk.yellow(`Forcing reinstall of ${release.version}`));
 	}
@@ -1690,6 +1789,12 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 
 	if (opts.check) {
 		// Just check, don't install
+		if (opts.overlay) {
+			console.log(chalk.dim("Overlay update plan:"));
+			for (const step of describeOverlayPlan(opts.overlay, release.version)) {
+				console.log(chalk.dim(`  - ${step}`));
+			}
+		}
 		return;
 	}
 
@@ -1700,12 +1805,20 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 	try {
 		const forceBinary = shouldForceBinaryUpdate(release);
 		const target = await resolveUpdateTarget({ allowPackageManagers: !forceBinary });
-		if (target.method === "nix") {
+		if (opts.overlay && target.method !== "binary") {
+			throw new OverlayUpdateError(
+				`an update overlay is configured, but ${APP_NAME} is installed via ${target.method}`,
+				`overlay builds replace a standalone binary; clear update.overlayRepo or pass --no-overlay to install the stock ${target.method} release`,
+			);
+		}
+		if (opts.overlay && target.method === "binary") {
+			await updateViaOverlayAt(target.path, release.version, opts.overlay);
+		} else if (target.method === "nix") {
 			console.log(chalk.yellow("This installation is managed by Nix and cannot update itself."));
 			console.log(chalk.dim("Update the flake input or profile that provides omp, then rebuild."));
 		} else if (target.method === "brew") {
 			await updateViaHomebrew(release.version, opts.force);
-		} else if (target.method === "mise") {
+		} else if (resolvedTarget.method === "mise") {
 			await updateViaMise(release.version, opts.force);
 		} else if (target.method === "bun" || target.method === "npm") {
 			if (forceBinary) {
@@ -1739,7 +1852,12 @@ export async function runUpdateCommand(opts: { force: boolean; check: boolean })
 			}
 		}
 	} catch (err) {
-		console.error(chalk.red(`Update failed: ${err}`));
+		if (err instanceof OverlayUpdateError) {
+			console.error(chalk.red(`Overlay update failed: ${err.message}`));
+			if (err.hint) console.error(chalk.dim(err.hint));
+		} else {
+			console.error(chalk.red(`Update failed: ${err}`));
+		}
 		process.exit(1);
 	}
 }
@@ -1757,11 +1875,12 @@ ${chalk.bold("Options:")}
   -c, --check     Check for updates without installing
   -f, --force     Force reinstall even if up to date
   -l, --plugins   Update installed plugins
+      --no-overlay  Ignore update.overlayRepo and install the stock release
 
 ${chalk.bold("Examples:")}
   ${APP_NAME} update              Update to latest version
   ${APP_NAME} update --check      Check if updates are available
-  ${APP_NAME} update --force      Force reinstall
+  ${APP_NAME} update --force      Force reinstall (rebuilds a configured overlay)
   ${APP_NAME} update -l           Update installed plugins
 `);
 }

@@ -34,6 +34,7 @@ import type { WorkerInbound as JsWorkerInbound, WorkerOutbound as JsWorkerOutbou
 import { DAEMON_BROKER_WORKER_ARG } from "./launch/protocol";
 import { TERMINAL_OUTPUT_WORKER_ARG } from "./launch/terminal-output-worker-protocol";
 import { LSP_MUX_WORKER_ARG } from "./lsp/mux/protocol";
+import { MEMPALACE_MINE_WORKER_ARG } from "./mempalace-native/mine-protocol";
 import { COMPUTER_WORKER_ARG } from "./tools/computer/protocol";
 import { smokeTestComputerWorker } from "./tools/computer/supervisor";
 import { startComputerWorker } from "./tools/computer/worker-entry";
@@ -91,6 +92,7 @@ async function runSmokeTest(): Promise<void> {
 	const { smokeTestSttWorker } = await import("./stt/asr-client");
 	const { smokeTestTtsWorker } = await import("./tts/tts-client");
 	const { smokeTestMnemopiEmbedWorker } = await import("./mnemopi/embed-client");
+	const { smokeTestMempalaceMineWorker } = await import("./mempalace-native/mine-client");
 	const { smokeTestJsEvalWorker } = await import("./eval/js/context-manager");
 	// Other smoke dependencies stay lazy so normal CLI startup does not load their worker clients.
 	const { smokeTestDaemonBroker } = await import("./launch/client");
@@ -116,6 +118,7 @@ async function runSmokeTest(): Promise<void> {
 	await smokeTestComputerWorker();
 	await smokeTestTtsWorker();
 	await smokeTestMnemopiEmbedWorker();
+	await smokeTestMempalaceMineWorker();
 	await smokeTestDaemonBroker();
 	await smokeTestLspMux();
 	await smokeTestTerminalOutputWorker();
@@ -209,6 +212,11 @@ async function runWorkerEntrypoint(arg: string | undefined): Promise<boolean> {
 		if (parentPort) installWorkerInbox(parentPort);
 		// This selector is the isolation boundary; a static import would evaluate xterm in normal CLI startup.
 		await import("./launch/terminal-output-worker");
+		return true;
+	}
+	if (arg === MEMPALACE_MINE_WORKER_ARG) {
+		const { startMempalaceMineWorker } = await import("./mempalace-native/mine-worker");
+		await runIpcSubprocessWorker(startMempalaceMineWorker);
 		return true;
 	}
 	if (arg === DAEMON_BROKER_WORKER_ARG) {

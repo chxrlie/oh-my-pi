@@ -140,7 +140,7 @@ export const TAB_GROUPS: Record<SettingTab, readonly string[]> = {
 		"Git",
 	],
 	context: ["General", "Compaction", "Rules (TTSR)", "Experimental"],
-	memory: ["General", "Auto-Learn", "Mnemopi", "MemPalace", "Hindsight"],
+	memory: ["General", "Auto-Learn", "Mnemopi", "MemPalace", "MemPalace Native", "Hindsight"],
 	files: ["Editing", "Reading", "Read Summaries", "LSP"],
 	shell: ["Bash", "Eval & Runtimes"],
 	tools: [
@@ -1847,6 +1847,41 @@ export const SETTINGS_SCHEMA = {
 		type: "enum",
 		values: ["summary", "expanded", "hidden"] as const,
 		default: "summary",
+	},
+
+	"update.overlayRepo": {
+		type: "string",
+		default: "",
+		ui: {
+			tab: "interaction",
+			group: "Startup & Updates",
+			label: "Update Overlay Checkout",
+			description:
+				"Path to a git checkout whose local patches are rebased onto each release and rebuilt, instead of installing the stock binary; empty disables overlay updates",
+		},
+	},
+
+	"update.overlayBranch": {
+		type: "string",
+		default: "",
+		ui: {
+			tab: "interaction",
+			group: "Startup & Updates",
+			label: "Update Overlay Branch",
+			description: "Branch that must be checked out in the overlay repo; empty accepts whichever branch is active",
+		},
+	},
+
+	"update.overlayRemote": {
+		type: "string",
+		default: "",
+		ui: {
+			tab: "interaction",
+			group: "Startup & Updates",
+			label: "Update Overlay Remote",
+			description: "Remote in the overlay repo that carries upstream release tags; empty auto-detects",
+		},
+	},
 		ui: {
 			tab: "interaction",
 			group: "Startup & Updates",
@@ -2616,12 +2651,12 @@ export const SETTINGS_SCHEMA = {
 	"memories.summaryInjectionTokenLimit": { type: "number", default: 5000 },
 
 	// Memory backend selector — picks between local memories pipeline,
-	// Mnemopi local SQLite, MemPalace (local Python package), Hindsight remote
-	// memory, or off. The legacy `memories.enabled` flag is migration input
-	// only; see config/settings.ts.
+	// Mnemopi local SQLite, MemPalace (local Python package), the native
+	// TypeScript MemPalace store, Hindsight remote memory, or off. The legacy
+	// `memories.enabled` flag is migration input only; see config/settings.ts.
 	"memory.backend": {
 		type: "enum",
-		values: ["off", "local", "hindsight", "mnemopi", "mempalace"] as const,
+		values: ["off", "local", "hindsight", "mnemopi", "mempalace", "mempalace-native"] as const,
 		default: "off",
 		ui: {
 			tab: "memory",
@@ -2641,6 +2676,11 @@ export const SETTINGS_SCHEMA = {
 					value: "mempalace",
 					label: "MemPalace",
 					description: "Local MemPalace store driven by the Python mempalace package (MCP + CLI)",
+				},
+				{
+					value: "mempalace-native",
+					label: "MemPalace (native)",
+					description: "Pure-TypeScript MemPalace store with Smart Mining — no Python dependency",
 				},
 			],
 		},
@@ -2944,6 +2984,44 @@ export const SETTINGS_SCHEMA = {
 			label: "MemPalace Import Local Memories",
 			description: "One-time import of the local memories directory into the palace on session start",
 			condition: "mempalaceActive",
+		},
+	},
+
+	// Native MemPalace memory backend — a pure-TypeScript palace (bun:sqlite +
+	// the local embeddings worker) with no Python dependency. Booleans surface
+	// in the UI behind `mempalaceNativeActive`; the Smart Mining numbers are
+	// config-file-only knobs (numbers without `options` are hidden).
+	"mempalaceNative.dbPath": { type: "string", default: "" },
+	"mempalaceNative.searchLimit": { type: "number", default: 10 },
+	"mempalaceNative.wakeUpTokenBudget": { type: "number", default: 900 },
+	"mempalaceNative.ingestIntervalMessages": { type: "number", default: 15 },
+	// Smart Mining: mining is process-intensive, so it runs in a subprocess, in
+	// bounded slices, only when the agent is idle, and only over files the
+	// ledger proves have changed. These bound that machinery.
+	"mempalaceNative.mineBudgetMillis": { type: "number", default: 4000 },
+	"mempalaceNative.mineIdleDelayMillis": { type: "number", default: 2000 },
+	"mempalaceNative.mineMinIntervalMillis": { type: "number", default: 60000 },
+	"mempalaceNative.mineMaxAutoEstimatedMillis": { type: "number", default: 120000 },
+	"mempalaceNative.embeddings": {
+		type: "boolean",
+		default: true,
+		ui: {
+			tab: "memory",
+			group: "MemPalace Native",
+			label: "MemPalace Native Embeddings",
+			description: "Add local vector search to the native palace; lexical search still works without it",
+			condition: "mempalaceNativeActive",
+		},
+	},
+	"mempalaceNative.autoIngest": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "memory",
+			group: "MemPalace Native",
+			label: "MemPalace Native Smart Mining",
+			description: "Incrementally mine the current project while the session is idle, in bounded slices",
+			condition: "mempalaceNativeActive",
 		},
 	},
 

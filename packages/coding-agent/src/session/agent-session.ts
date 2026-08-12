@@ -147,6 +147,8 @@ import type { HindsightSessionState } from "../hindsight/state";
 import { type LocalProtocolOptions, resolveLocalUrlToPath } from "../internal-urls";
 import type { IrcMessage } from "../irc/bus";
 import type { DaemonCompletionNotification } from "../launch/protocol";
+import { getMempalaceNativeSessionState, setMempalaceNativeSessionState } from "../mempalace-native/state";
+import type { MempalaceNativeSession } from "../mempalace-native/types";
 import { shutdownMnemopiEmbedClient } from "../mnemopi/embed-client";
 import { getMnemopiSessionState, type MnemopiSessionState, setMnemopiSessionState } from "../mnemopi/state";
 import { containsOrchestrate, renderOrchestrateNotice } from "../modes/orchestrate";
@@ -1760,6 +1762,10 @@ export class AgentSession {
 
 	getMnemopiSessionState(): MnemopiSessionState | undefined {
 		return getMnemopiSessionState(this);
+	}
+
+	getMempalaceNativeSessionState(): MempalaceNativeSession | undefined {
+		return getMempalaceNativeSessionState(this);
 	}
 
 	/** TTSR manager for time-traveling stream rules */
@@ -3978,6 +3984,7 @@ export class AgentSession {
 
 		const hindsightState = this.getHindsightSessionState();
 		const mnemopiState = setMnemopiSessionState(this, undefined);
+		const mempalaceState = setMempalaceNativeSessionState(this, undefined);
 		const advisorRecorderClosed = this.#advisors.recorderClosed();
 		const results = await Promise.allSettled([
 			this.#disposeOwnedAsyncJobs(),
@@ -3989,6 +3996,13 @@ export class AgentSession {
 			advisorRecorderClosed,
 			hindsightState?.flushRetainQueue() ?? Promise.resolve(),
 			this.#disposeMnemopi(mnemopiState, options.mnemopiConsolidateTimeoutMs),
+			(async () => {
+				try {
+					mempalaceState?.dispose();
+				} catch (error) {
+					logger.warn("Failed to dispose MemPalace native session state", { error: String(error) });
+				}
+			})(),
 		]);
 		for (const result of results) {
 			if (result.status === "rejected") {

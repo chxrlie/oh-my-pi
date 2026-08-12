@@ -1705,6 +1705,7 @@ async function createAgentSessionScoped(options: CreateAgentSessionOptions): Pro
 			isDisposed: () => session?.isDisposed ?? false,
 			getHindsightSessionState: () => session?.getHindsightSessionState(),
 			getMnemopiSessionState: () => session?.getMnemopiSessionState(),
+			getMempalaceNativeSessionState: () => session?.getMempalaceNativeSessionState(),
 			getAgentId: () => resolvedAgentId,
 			getToolByName: name => session?.getToolByName(name),
 			agentRegistry,

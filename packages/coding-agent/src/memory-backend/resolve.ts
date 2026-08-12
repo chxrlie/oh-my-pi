@@ -11,6 +11,7 @@ import type { MemoryBackend } from "./types";
  *   - `memory.backend === "hindsight"`  → Hindsight remote memory
  *   - `memory.backend === "mnemopi"`  → local Mnemopi SQLite memory
  *   - `memory.backend === "mempalace"` → local MemPalace (Python) memory
+ *   - `memory.backend === "mempalace-native"` → local MemPalace (TypeScript) memory
  *   - `memory.backend === "local"`      → local rollout summary pipeline
  *   - everything else                   → no-op
  *
@@ -22,6 +23,7 @@ export async function resolveMemoryBackend(settings: Settings): Promise<MemoryBa
 	if (id === "hindsight") return (await import("../hindsight/backend")).hindsightBackend;
 	if (id === "mnemopi") return (await import("../mnemopi/backend")).mnemopiBackend;
 	if (id === "mempalace") return (await import("../mempalace/backend")).mempalaceBackend;
+	if (id === "mempalace-native") return (await import("../mempalace-native/backend")).mempalaceNativeBackend;
 	if (id === "local") return localBackend;
 	return offBackend;
 }

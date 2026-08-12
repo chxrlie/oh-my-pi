@@ -620,6 +620,14 @@
 ### Removed
 
 - Removed the dangling `MCPManager.setOnNotification` single-slot setter, which had no callers in the runtime. Replaced by `MCPManager.addNotificationListener` — multi-listener, per-listener error isolation, returns an unsubscribe function.
+### Added
+
+- Added a native MemPalace memory backend (`memory.backend: mempalace-native`) implementing the wing/room/drawer/diary store entirely in TypeScript over bun:sqlite, with FTS5 lexical search fused with optional local vector search, and no Python dependency.
+- Added the `mempalace` builtin tool, exposing palace search, save, drawer and wing/room browsing, diary, mining, sync and status when the native backend is selected.
+- Added Smart Mining for the native palace: the walk, hashing and chunking run in a dedicated subprocess with explicit backpressure, an incremental ledger skips files whose size and mtime are unchanged, a stat-only pre-flight skips runs with nothing to do or too much to do, and an idle-window scheduler runs bounded slices that abort the moment a new user turn starts.
+- Added an overlay update path for `omp update`: with a local git checkout configured, the updater rebases that checkout's branch onto the upstream release tag, runs `bun install` and `bun run build`, and installs the resulting binary through the same backup/verify/rollback swap as a stock download, so in-tree local patches survive an update instead of being replaced by the stock release. A sidecar stamp beside the installed binary records the release version and overlay commit it was built from, so committing a new patch and re-running the update rebuilds even when upstream has not moved.
+- Added the `update.overlayRepo`, `update.overlayBranch` and `update.overlayRemote` settings (Startup & Updates) to configure overlay updates: the checkout path (empty disables the feature), the branch that must already be checked out, and the remote carrying upstream release tags (empty auto-detects the remote whose URL points at the upstream repository).
+- Added the `--no-overlay` flag to `omp update`, which ignores a configured overlay and installs the stock release binary.
 
 ## [17.1.8] - 2026-07-28
 
