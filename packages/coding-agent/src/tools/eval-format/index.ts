@@ -3,11 +3,13 @@ import { formatJavaScriptForDisplay } from "./javascript";
 import { formatJuliaForDisplay } from "./julia";
 import { formatPythonForDisplay } from "./python";
 import { formatRubyForDisplay } from "./ruby";
+import { formatRustForDisplay } from "./rust";
 
 export * from "./javascript";
 export * from "./julia";
 export * from "./python";
 export * from "./ruby";
+export * from "./rust";
 
 /** Formats an arbitrary eval-code prefix for display without changing the executed source. */
 export function formatEvalCodeForDisplay(source: string, language: EvalLanguage): string {
@@ -20,5 +22,7 @@ export function formatEvalCodeForDisplay(source: string, language: EvalLanguage)
 			return formatJuliaForDisplay(source);
 		case "python":
 			return formatPythonForDisplay(source);
+		case "rust":
+			return formatRustForDisplay(source);
 	}
 }

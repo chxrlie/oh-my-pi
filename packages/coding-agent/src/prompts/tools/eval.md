@@ -1,4 +1,4 @@
-Run one step of code in a persistent kernel. State persists across calls and subagents.
+Run one step of code in a persistent kernel. State persists across calls and subagents.{{#if rs}} Rust is single-shot (compiled per cell); state does NOT persist.{{/if}}
 
 Work incrementally: imports → define → test → use, each its own cell. Re-run setup ONLY after `reset`, kernel crash.
 Parallelize *within* a cell with `parallel(thunks)`, not by batching.
@@ -9,13 +9,14 @@ Parallelize *within* a cell with `parallel(thunks)`, not by batching.
 On error, fix and re-run only the failing step.
 
 <prelude>
-{{#ifAll py js}}Python: sync, kwargs. JS: async, ONE trailing object literal, never positional.{{else}}{{#if py}}Sync; kwargs.{{/if}}{{#if js}}Async; ONE trailing object literal, never positional.{{/if}}{{/ifAll}}{{#if rb}} Ruby: sync, kwargs.{{/if}}{{#if jl}} Julia: sync, kwargs.{{/if}}
+{{#ifAll py js}}Python: sync, kwargs. JS: async, ONE trailing object literal, never positional.{{else}}{{#if py}}Sync; kwargs.{{/if}}{{#if js}}Async; ONE trailing object literal, never positional.{{/if}}{{/ifAll}}{{#if rb}} Ruby: sync, kwargs.{{/if}}{{#if jl}} Julia: sync, kwargs.{{/if}}{{#if rs}} Rust: sync, std-only. Each cell is a standalone `fn main()` with `omp_prelude` helpers in scope.{{/if}}
 ```
 display(value) → None        print(value, ...) → None
 read(path, offset?=1, limit?=None) → str
 write(path, content) → str
 env(key?=None, value?=None) → str | None | dict
-output(*ids, format?="raw", query?=None, offset?=None, limit?=None) → str | dict | list[dict]
+{{#if rs}}display_debug(value) → None   display_pretty(value) → None
+{{/if}}output(*ids, format?="raw", query?=None, offset?=None, limit?=None) → str | dict | list[dict]
 tool.<name>(args) → unknown
     Invoke any session tool; `args` = its parameter object.
 completion(prompt, model?="default"|"smol"|"slow", system?=None, schema?=None) → str | dict

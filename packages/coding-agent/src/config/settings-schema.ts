@@ -3743,6 +3743,16 @@ export const SETTINGS_SCHEMA = {
 		},
 	},
 
+	"eval.rs": {
+		type: "boolean",
+		default: false,
+		ui: {
+			tab: "shell",
+			group: "Eval & Runtimes",
+			label: "Rust Eval Backend",
+			description: "Allow the eval tool to dispatch Rust cells to the single-shot rustc compiler",
+		},
+	},
 	// Runtime knobs (consumed by eval backends and the /python slash command)
 	"python.kernelMode": {
 		type: "enum",

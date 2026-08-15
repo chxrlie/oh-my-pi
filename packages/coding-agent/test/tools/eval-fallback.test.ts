@@ -140,6 +140,7 @@ describe("EvalTool language dispatch", () => {
 			js: false,
 			ruby: false,
 			julia: false,
+			rust: false,
 		});
 	});
 

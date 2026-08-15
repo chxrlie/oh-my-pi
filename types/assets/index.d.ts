@@ -17,6 +17,11 @@ declare module "*.rb" {
 	const content: string;
 	export default content;
 }
+declare module "*.rs" {
+	const content: string;
+	export default content;
+}
+
 
 declare module "*.jl" {
 	const content: string;
