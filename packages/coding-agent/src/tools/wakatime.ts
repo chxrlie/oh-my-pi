@@ -1,5 +1,5 @@
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
-import { type } from "arktype";
+import { type } from "@oh-my-pi/omptype";
 import wakatimeDescription from "../prompts/tools/wakatime.md" with { type: "text" };
 import { type ProjectNameSource, resolveProjectNameDetailed } from "../usage/project-resolver";
 import {

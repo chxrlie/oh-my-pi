@@ -1847,6 +1847,29 @@ export const SETTINGS_SCHEMA = {
 		type: "enum",
 		values: ["summary", "expanded", "hidden"] as const,
 		default: "summary",
+		ui: {
+			tab: "interaction",
+			group: "Startup & Updates",
+			label: "Startup Changelog",
+			description: "Choose whether update notes start as a summary, full details, or stay hidden",
+			options: [
+				{
+					value: "summary",
+					label: "Summary",
+					description: "Show release and change counts with a /changelog hint",
+				},
+				{
+					value: "expanded",
+					label: "Expanded",
+					description: "Show the recent release notes in full",
+				},
+				{
+					value: "hidden",
+					label: "Hidden",
+					description: "Do not show release notes on startup",
+				},
+			],
+		},
 	},
 
 	"update.overlayRepo": {
@@ -1880,30 +1903,6 @@ export const SETTINGS_SCHEMA = {
 			group: "Startup & Updates",
 			label: "Update Overlay Remote",
 			description: "Remote in the overlay repo that carries upstream release tags; empty auto-detects",
-		},
-	},
-		ui: {
-			tab: "interaction",
-			group: "Startup & Updates",
-			label: "Startup Changelog",
-			description: "Choose whether update notes start as a summary, full details, or stay hidden",
-			options: [
-				{
-					value: "summary",
-					label: "Summary",
-					description: "Show release and change counts with a /changelog hint",
-				},
-				{
-					value: "expanded",
-					label: "Expanded",
-					description: "Show the recent release notes in full",
-				},
-				{
-					value: "hidden",
-					label: "Hidden",
-					description: "Do not show release notes on startup",
-				},
-			],
 		},
 	},
 

@@ -1,6 +1,6 @@
 import type { AgentTool, AgentToolResult } from "@oh-my-pi/pi-agent-core";
 import { formatBytes, logger, untilAborted } from "@oh-my-pi/pi-utils";
-import { type } from "arktype";
+import { type } from "@oh-my-pi/omptype";
 import type {
 	Drawer,
 	MempalaceNativeSession,

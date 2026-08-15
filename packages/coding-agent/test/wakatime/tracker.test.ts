@@ -8,7 +8,7 @@ import {
 	type TrackedActivity,
 	withWakatimeTracking,
 } from "@oh-my-pi/pi-coding-agent/wakatime";
-import { type } from "arktype";
+import { type } from "@oh-my-pi/omptype";
 
 const CWD = path.resolve("/tmp", "wakatime-workspace");
 

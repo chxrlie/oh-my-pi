@@ -643,7 +643,7 @@ export function resolveUpdateTargetFromPath(
  * Homebrew/mise detection always runs: both managers install GitHub release
  * binaries and stay valid regardless of how the release is distributed.
  */
-async function resolveUpdateTarget(options: { allowPackageManagers: boolean }): Promise<UpdateTarget> {
+async function resolveUpdateTarget(options: { allowPackageManagers: boolean } = { allowPackageManagers: true }): Promise<UpdateTarget> {
 	const bunBinDir = options.allowPackageManagers ? await getBunGlobalBinDir() : undefined;
 	const npmBinDir = options.allowPackageManagers ? await getNpmGlobalBinDir() : undefined;
 	const homebrewPrefix = await getHomebrewFormulaPrefix();
@@ -1713,7 +1713,7 @@ export async function updateViaOverlayAt(
 					expectedVersion: version,
 					verifyInstalledVersion: options.verifyInstalledVersion ?? verifyInstalledVersion,
 				});
-				await sweepStaleBackups(targetPath);
+				await sweepStaleUpdateArtifacts(targetPath);
 			},
 		},
 	});
@@ -1818,7 +1818,7 @@ export async function runUpdateCommand(opts: {
 			console.log(chalk.dim("Update the flake input or profile that provides omp, then rebuild."));
 		} else if (target.method === "brew") {
 			await updateViaHomebrew(release.version, opts.force);
-		} else if (resolvedTarget.method === "mise") {
+		} else if (target.method === "mise") {
 			await updateViaMise(release.version, opts.force);
 		} else if (target.method === "bun" || target.method === "npm") {
 			if (forceBinary) {
@@ -1838,7 +1838,7 @@ export async function runUpdateCommand(opts: {
 			} else {
 				await updateViaNpm(release);
 			}
-		} else {
+		} else if (target.method === "binary") {
 			if (forceBinary && target.replacesSymlink) {
 				console.log(chalk.dim("Replacing the package-manager launcher with the standalone binary."));
 			}
